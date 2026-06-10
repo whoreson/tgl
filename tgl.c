@@ -32,6 +32,8 @@
 
 #include <assert.h>
 
+int binlog_read = 0;
+
 struct tgl_state tgl_state;
 
     

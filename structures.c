@@ -987,15 +987,125 @@ void tglf_fetch_message_action (struct tgl_state *TLS, struct tgl_message_action
 }
 
 struct tgl_message *tglf_fetch_alloc_message_short (struct tgl_state *TLS, struct tl_ds_updates *DS_U) {
-  (void)TLS; (void)DS_U;
-  return NULL;
+  tgl_peer_t *P = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_U->user_id)));
+  if (!P || !(P->flags & TGLPF_CREATED)) {
+    tgl_do_get_difference (TLS, 0, 0, 0);
+    return NULL;
+  }
+
+  tgl_message_id_t msg_id = tgl_peer_id_to_msg_id (P->id, DS_LVAL (DS_U->id));
+  struct tgl_message *M = tgl_message_get (TLS, &msg_id);
+  if (!M) {
+    M = talloc0 (sizeof (*M));
+    M->permanent_id = msg_id;
+    tglm_message_insert_tree (TLS, M);
+    TLS->messages_allocated ++;
+  }
+
+  int flags = M->flags & 0xffff;
+  if (M->flags & TGLMF_PENDING) {
+    M->flags ^= TGLMF_PENDING;
+  }
+  if (!(flags & TGLMF_CREATED)) {
+    flags |= TGLMF_CREATE | TGLMF_CREATED;
+  }
+
+  int f = DS_LVAL (DS_U->flags);
+  if (f & 1) flags |= TGLMF_UNREAD;
+  if (f & 2) flags |= TGLMF_OUT;
+  if (f & 16) flags |= TGLMF_MENTION;
+
+  struct tl_ds_message_media A;
+  A.magic = CODE_message_media_empty;
+
+  tgl_peer_id_t our_id = TLS->our_id;
+  tgl_peer_id_t peer_id = P->id;
+  tgl_peer_id_t fwd_from_id = TGL_MK_USER (0);
+  int *fwd_date = NULL;
+  if (DS_U->fwd_from && DS_U->fwd_from->from_id) {
+    fwd_from_id = tglf_fetch_peer_id (TLS, DS_U->fwd_from->from_id);
+    fwd_date = DS_U->fwd_from->date;
+  }
+
+  bl_do_edit_message (TLS, &msg_id,
+    (f & 2) ? &our_id : &peer_id,
+    (f & 2) ? &peer_id : &our_id,
+    DS_U->fwd_from ? &fwd_from_id : NULL,
+    fwd_date,
+    DS_U->date,
+    DS_STR (DS_U->message),
+    &A,
+    NULL,
+    DS_U->reply_to ? DS_U->reply_to->reply_to_msg_id : NULL,
+    NULL,
+    (void *)DS_U->entities,
+    flags
+  );
+  return M;
 }
 
 struct tgl_message *tglf_fetch_alloc_message_short_chat (struct tgl_state *TLS, struct tl_ds_updates *DS_U) {
-  (void)TLS; (void)DS_U;
-  return NULL;
-}
+  tgl_peer_t *F = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_U->from_id)));
+  if (!F || !(F->flags & TGLPF_CREATED)) {
+    tgl_do_get_difference (TLS, 0, 0, 0);
+    return NULL;
+  }
+  tgl_peer_t *T = tgl_peer_get (TLS, TGL_MK_CHAT (DS_LVAL (DS_U->chat_id)));
+  if (!T || !(T->flags & TGLPF_CREATED)) {
+    tgl_do_get_difference (TLS, 0, 0, 0);
+    return NULL;
+  }
 
+  tgl_message_id_t msg_id = tgl_peer_id_to_msg_id (T->id, DS_LVAL (DS_U->id));
+  struct tgl_message *M = tgl_message_get (TLS, &msg_id);
+  if (!M) {
+    M = talloc0 (sizeof (*M));
+    M->permanent_id = msg_id;
+    tglm_message_insert_tree (TLS, M);
+    TLS->messages_allocated ++;
+  }
+
+  int flags = M->flags & 0xffff;
+  if (M->flags & TGLMF_PENDING) {
+    M->flags ^= TGLMF_PENDING;
+  }
+  if (!(flags & TGLMF_CREATED)) {
+    flags |= TGLMF_CREATE | TGLMF_CREATED;
+  }
+
+  int f = DS_LVAL (DS_U->flags);
+  if (f & 1) flags |= TGLMF_UNREAD;
+  if (f & 2) flags |= TGLMF_OUT;
+  if (f & 16) flags |= TGLMF_MENTION;
+
+  struct tl_ds_message_media A;
+  A.magic = CODE_message_media_empty;
+
+  tgl_peer_id_t from_id = F->id;
+  tgl_peer_id_t to_id = T->id;
+  tgl_peer_id_t fwd_from_id = TGL_MK_USER (0);
+  int *fwd_date = NULL;
+  if (DS_U->fwd_from && DS_U->fwd_from->from_id) {
+    fwd_from_id = tglf_fetch_peer_id (TLS, DS_U->fwd_from->from_id);
+    fwd_date = DS_U->fwd_from->date;
+  }
+
+  bl_do_edit_message (TLS, &msg_id,
+    &from_id,
+    &to_id,
+    DS_U->fwd_from ? &fwd_from_id : NULL,
+    fwd_date,
+    DS_U->date,
+    DS_STR (DS_U->message),
+    &A,
+    NULL,
+    DS_U->reply_to ? DS_U->reply_to->reply_to_msg_id : NULL,
+    NULL,
+    (void *)DS_U->entities,
+    flags
+  );
+  return M;
+}
 
 void tglf_fetch_message_media (struct tgl_state *TLS, struct tgl_message_media *M, struct tl_ds_message_media *DS_MM){
   (void)TLS;

@@ -1851,7 +1851,10 @@ static void out_peer_id (struct tgl_state *TLS, tgl_peer_id_t id) {
     out_long (id.access_hash);
     break;
   default:
-    assert (0);
+    vlogprintf(E_WARNING, "out_peer_id: unknown peer type %d\n", tgl_get_peer_type(id));
+    return;
+
+
   }
 }
 
@@ -3759,7 +3762,6 @@ static int lookup_state_on_answer (struct tgl_state *TLS, struct query *q, void 
 
 
 //int get_difference_active;
-extern int binlog_read;
 static int get_difference_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
   struct tl_ds_updates_difference *DS_UD = D;
 
@@ -3988,6 +3990,7 @@ void tgl_do_get_channel_difference (struct tgl_state *TLS, int id, void (*callba
   tgl_do_insert_header (TLS);
 
   out_int (CODE_updates_get_channel_difference);
+  out_int (0);  /* flags */
   out_int (CODE_input_channel);
   out_long (tgl_get_peer_id (E->id));
   out_long (E->channel.access_hash);
