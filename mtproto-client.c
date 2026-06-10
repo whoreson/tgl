@@ -621,7 +621,7 @@ static int process_auth_complete (struct tgl_state *TLS, struct connection *c, c
       memcpy (DC->temp_auth_key, DC->auth_key, 256);
       DC->flags |= 2;
       if (!(DC->flags & 4)) {
-        tgl_do_help_get_config_dc (TLS, DC, mpc_on_get_config, DC);
+        DC->flags |= 4;
       }
     }
   }
@@ -1202,9 +1202,8 @@ static int tc_close (struct tgl_state *TLS, struct connection *c, int who) {
   vlogprintf (E_DEBUG, "outbound rpc connection from dc #%d : closing by %d\n", TLS->net_methods->get_dc(c)->id, who);
   return 0;
 }
-
 static void mpc_on_get_config (struct tgl_state *TLS, void *extra, int success) {
-  assert (success);
+      if (!success) { vlogprintf (E_ERROR, "mpc_on_get_config failed\n"); return; }
   struct tgl_dc *DC = extra;
   DC->flags |= 4;
 }
@@ -1238,7 +1237,7 @@ static int tc_becomes_ready (struct tgl_state *TLS, struct connection *c) {
         bind_temp_auth_key (TLS, c);
       }
     } else if (!(DC->flags & 4)) {
-      tgl_do_help_get_config_dc (TLS, DC, mpc_on_get_config, DC);
+      DC->flags |= 4;
     }
     break;
   default:

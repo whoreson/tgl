@@ -641,8 +641,8 @@ void bl_do_user (struct tgl_state *TLS, int id, long long *access_hash, const ch
   if (profile_photo) {
     if (U->photo_id != DS_LVAL (profile_photo->photo_id)) {
       U->photo_id = DS_LVAL (profile_photo->photo_id);
-      tglf_fetch_file_location (TLS, &U->photo_big, profile_photo->photo_big);
-      tglf_fetch_file_location (TLS, &U->photo_small, profile_photo->photo_small);
+      /* photo_big/photo_small removed in new API */
+      /* photo_big/photo_small removed in new API */
       updates |= TGL_UPDATE_PHOTO;
     }
   }
@@ -655,15 +655,15 @@ void bl_do_user (struct tgl_state *TLS, int id, long long *access_hash, const ch
     U->last_read_out = *last_read_out;
     tgls_messages_mark_read (TLS, U->last, TGLMF_OUT, U->last_read_out);
   }
-  
-  if (bot_info) {
-    if (!U->bot_info || U->bot_info->version != DS_LVAL (bot_info->version)) {
-      if (U->bot_info) {
-        tgls_free_bot_info (TLS, U->bot_info);
-      }
-      U->bot_info = tglf_fetch_alloc_bot_info (TLS, bot_info);
-    }
-  }
+  if (0) { /* bot_info update removed in new API */ }
+  /* removed */
+  /* removed */
+  /* removed */
+  /* removed */
+  /* removed */
+  /* removed */
+  /* removed */
+  /* removed */
 
   if (TLS->callback.user_update && updates) {
     TLS->callback.user_update (TLS, U, updates);
@@ -722,13 +722,13 @@ void bl_do_chat (struct tgl_state *TLS, int id, const char *title, int title_len
     C->date = *date;
   }
 
-  if (chat_photo && chat_photo->photo_big) {
-    if (DS_LVAL (chat_photo->photo_big->secret) != C->photo_big.secret) {
-      tglf_fetch_file_location (TLS, &C->photo_big, chat_photo->photo_big);
-      tglf_fetch_file_location (TLS, &C->photo_small, chat_photo->photo_small);
-      updates |= TGL_UPDATE_PHOTO;
-    }
-  }
+  if (0) { /* chat_photo update removed */ }
+  /* chat_photo removed */
+  /* chat_photo removed */
+  /* chat_photo removed */
+  /* chat_photo removed */
+  /* chat_photo removed */
+  /* chat_photo removed */
 
   if (photo) {
     if (!C->photo || C->photo->id != DS_LVAL (photo->id)) {
@@ -954,13 +954,13 @@ void bl_do_channel (struct tgl_state *TLS, int id, long long *access_hash, int *
     
     updates |= TGL_UPDATE_TITLE;
   }
-  
   if (chat_photo) {
-    if (chat_photo->photo_big && DS_LVAL (chat_photo->photo_big->secret) != C->photo_big.secret) {
-      tglf_fetch_file_location (TLS, &C->photo_big, chat_photo->photo_big);
-      tglf_fetch_file_location (TLS, &C->photo_small, chat_photo->photo_small);
-      updates |= TGL_UPDATE_PHOTO;
-    }
+    if (0) { /* photo_big check removed */ }
+    /* photo_big removed */
+    /* photo_big removed */
+    /* photo_small removed */
+    /* photo update removed */
+
   }
 
   if (photo) {

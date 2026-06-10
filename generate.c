@@ -68,7 +68,40 @@ char *strndup (const char *s, size_t n) {
 #include "generate.h"
 
 #include "tree.h"
-
+// Helper: returns safe C identifier for field name, renaming C keywords
+static const char *safe_field_name (const char *id) {
+      if (!id || !*id) return id;
+  if (!strcmp (id, "static")) return "static_f";
+  if (!strcmp (id, "default")) return "default_f";
+  if (!strcmp (id, "int")) return "int_f";
+  if (!strcmp (id, "long")) return "long_f";
+  if (!strcmp (id, "short")) return "short_f";
+  if (!strcmp (id, "double")) return "double_f";
+  if (!strcmp (id, "float")) return "float_f";
+  if (!strcmp (id, "char")) return "char_f";
+  if (!strcmp (id, "void")) return "void_f";
+  if (!strcmp (id, "struct")) return "struct_f";
+  if (!strcmp (id, "union")) return "union_f";
+  if (!strcmp (id, "enum")) return "enum_f";
+  if (!strcmp (id, "typedef")) return "typedef_f";
+  if (!strcmp (id, "const")) return "const_f";
+  if (!strcmp (id, "volatile")) return "volatile_f";
+  if (!strcmp (id, "signed")) return "signed_f";
+  if (!strcmp (id, "unsigned")) return "unsigned_f";
+  if (!strcmp (id, "return")) return "return_f";
+  if (!strcmp (id, "break")) return "break_f";
+  if (!strcmp (id, "continue")) return "continue_f";
+  if (!strcmp (id, "case")) return "case_f";
+  if (!strcmp (id, "switch")) return "switch_f";
+  if (!strcmp (id, "for")) return "for_f";
+  if (!strcmp (id, "while")) return "while_f";
+  if (!strcmp (id, "do")) return "do_f";
+  if (!strcmp (id, "if")) return "if_f";
+  if (!strcmp (id, "else")) return "else_f";
+  if (!strcmp (id, "goto")) return "goto_f";
+  if (!strcmp (id, "sizeof")) return "sizeof_f";
+  return id;
+}
 int header;
 
 #define tl_type_name_cmp(a,b) (a->name > b->name ? 1 : a->name < b->name ? -1 : 0)
@@ -539,8 +572,8 @@ int gen_field_fetch (struct arg *arg, int *vars, int num, int empty) {
   if (!empty) {
     printf("%sif (multiline_output >= 2) { print_offset (); }\n", offset);
   }
-  if (arg->id && strlen (arg->id) && !empty) {
-    printf ("%sif (!disable_field_names) { eprintf (\" %s :\"); }\n", offset, arg->id);
+  if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id)) && !empty) {
+    printf ("%sif (!disable_field_names) { eprintf (\" %s :\"); }\n", offset, safe_field_name (arg->id));
   }
   if (arg->var_num >= 0) {
     assert (TL_TREE_METHODS (arg->type)->type (arg->type) == NODE_TYPE_TYPE);
@@ -619,8 +652,8 @@ int gen_field_store (struct arg *arg, int *vars, int num, int from_func, int emp
   }
   char *fail = from_func ? "0" : "-1";
   char *expect = from_func ? "expect_token_ptr" : "expect_token";
-  if (arg->id && strlen (arg->id) > 0 && !empty) {
-    printf ("%sif (cur_token_len >= 0 && cur_token_len == %d && !cur_token_quoted && !memcmp (cur_token, \"%s\", cur_token_len)) {\n", offset, (int)(strlen (arg->id)), arg->id);
+  if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id)) > 0 && !empty) {
+    printf ("%sif (cur_token_len >= 0 && cur_token_len == %d && !cur_token_quoted && !memcmp (cur_token, \"%s\", cur_token_len)) {\n", offset, (int)(strlen (safe_field_name (arg->id))), safe_field_name (arg->id));
     printf ("%s  local_next_token ();\n", offset);
     printf ("%s  %s (\":\", 1);\n", offset, expect);
     printf ("%s}\n", offset);
@@ -700,13 +733,13 @@ int gen_field_autocomplete (struct arg *arg, int *vars, int num, int from_func, 
   }
   char *fail = from_func ? "0" : "-1";
   char *expect = from_func ? "expect_token_ptr_autocomplete" : "expect_token_autocomplete";
-  if (arg->id && strlen (arg->id) > 0 && !empty) {
-    printf ("%sif (cur_token_len == -3 && cur_token_real_len <= %d && !cur_token_quoted && !memcmp (cur_token, \"%s\", cur_token_real_len)) {\n", offset, (int)(strlen (arg->id)), arg->id);
-    printf ("%s  set_autocomplete_string (\"%s\");\n", offset, arg->id);
+  if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id)) > 0 && !empty) {
+    printf ("%sif (cur_token_len == -3 && cur_token_real_len <= %d && !cur_token_quoted && !memcmp (cur_token, \"%s\", cur_token_real_len)) {\n", offset, (int)(strlen (safe_field_name (arg->id))), safe_field_name (arg->id));
+    printf ("%s  set_autocomplete_string (\"%s\");\n", offset, safe_field_name (arg->id));
     printf ("%s  return %s;\n", offset, fail);
     printf ("%s}\n", offset);
 
-    printf ("%sif (cur_token_len >= 0 && cur_token_len == %d && !memcmp (cur_token, \"%s\", cur_token_len)) {\n", offset, (int)(strlen (arg->id)), arg->id);
+    printf ("%sif (cur_token_len >= 0 && cur_token_len == %d && !memcmp (cur_token, \"%s\", cur_token_len)) {\n", offset, (int)(strlen (safe_field_name (arg->id))), safe_field_name (arg->id));
     printf ("%s  local_next_token ();\n", offset);
     printf ("%s  %s (\":\", 1);\n", offset, expect);
     printf ("%s}\n", offset);
@@ -791,9 +824,9 @@ int gen_field_fetch_ds (struct arg *arg, int *vars, int num, int empty) {
     } else {
       assert (t == NAME_VAR_NUM);
       printf ("%sassert (in_remaining () >= 4);\n", offset);
-      if (arg->id && strlen (arg->id)) {
-        printf ("%sresult->%s = talloc (4);", offset, arg->id);
-        printf ("%s*result->%s = prefetch_int ();", offset, arg->id);
+      if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id))) {
+        printf ("%sresult->%s = talloc (4);", offset, safe_field_name (safe_field_name (arg->id)));
+        printf ("%s*result->%s = prefetch_int ();", offset, safe_field_name (arg->id));
       } else {
         printf ("%sresult->f%d = talloc (4);", offset, num - 1);
         printf ("%s*result->f%d = prefetch_int ();", offset, num - 1);
@@ -818,8 +851,8 @@ int gen_field_fetch_ds (struct arg *arg, int *vars, int num, int empty) {
       if (!bare && t == NODE_TYPE_TYPE) {
         bare = ((struct tl_tree_type *)arg->type)->self.flags & FLAG_BARE;
       }
-      if (arg->id && strlen (arg->id)) {
-        printf ("%sresult->%s = ", offset, arg->id);
+      if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id))) {
+        printf ("%sresult->%s = ", offset, safe_field_name (arg->id));
       } else {
         printf ("%sresult->f%d = ", offset, num - 1);
       }
@@ -839,8 +872,8 @@ int gen_field_fetch_ds (struct arg *arg, int *vars, int num, int empty) {
       printf ("%sstruct paramed_type *field%d = \n", offset, num);
       assert (gen_create (((struct tl_tree_array *)arg->type)->args[0]->type, vars, 2 + o) >= 0);
       printf (";\n");
-      if (arg->id && strlen (arg->id)) {
-        printf ("%sresult->%s = ", offset, arg->id);
+      if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id))) {
+        printf ("%sresult->%s = ", offset, safe_field_name (arg->id));
       } else {
         printf ("%sresult->f%d = ", offset, num - 1);
       }
@@ -848,8 +881,8 @@ int gen_field_fetch_ds (struct arg *arg, int *vars, int num, int empty) {
       printf ("%s{\n", offset);
       printf ("%s  int i = 0;\n", offset);
       printf ("%s  while (i < multiplicity%d) {\n", offset, num);
-      if (arg->id && strlen (arg->id)) {
-        printf ("%s    result->%s[i ++] =", offset, arg->id);
+      if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id))) {
+        printf ("%s    result->%s[i ++] =", offset, safe_field_name (arg->id));
       } else {
         printf ("%s    result->f%d[i ++] = ", offset, num - 1);
       }
@@ -881,14 +914,14 @@ int gen_field_free_ds (struct arg *arg, int *vars, int num, int empty) {
       assert (0);
     } else {
       assert (t == NAME_VAR_NUM);
-      if (arg->id && strlen (arg->id)) {
+      if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id))) {
         if (vars[arg->var_num] == 0) {
-          printf ("%sstruct paramed_type *var%d = INT2PTR (*D->%s);\n", offset, arg->var_num, arg->id);
+          printf ("%sstruct paramed_type *var%d = INT2PTR (*D->%s);\n", offset, arg->var_num, safe_field_name (arg->id));
           vars[arg->var_num] = 2;
         } else if (vars[arg->var_num] == 2) {
-          printf ("%sassert (vars%d == INT2PTR (*D->%s));\n", offset, arg->var_num, arg->id);
+          printf ("%sassert (vars%d == INT2PTR (*D->%s));\n", offset, arg->var_num, safe_field_name (arg->id));
         }
-        printf ("%stfree (D->%s, sizeof (*D->%s));\n", offset, arg->id, arg->id);
+        printf ("%stfree (D->%s, sizeof (*D->%s));\n", offset, safe_field_name (arg->id), safe_field_name (arg->id));
       } else {
         if (vars[arg->var_num] == 0) {
           printf ("%sstruct paramed_type *var%d = INT2PTR (*D->f%d);\n", offset, arg->var_num, num - 1);
@@ -906,8 +939,8 @@ int gen_field_free_ds (struct arg *arg, int *vars, int num, int empty) {
       assert (gen_create (arg->type, vars, 2 + o) >= 0);
       printf (";\n");
       int any = (t == NODE_TYPE_VAR_TYPE) || ((struct tl_tree_type *)arg->type)->type->name == NAME_VECTOR;
-      if (arg->id && strlen (arg->id)) {
-        printf ("%sfree_ds_type_%s (D->%s, field%d);\n", offset, any ? "any" : ((struct tl_tree_type *)arg->type)->type->print_id, arg->id, num);      
+      if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id))) {
+        printf ("%sfree_ds_type_%s (D->%s, field%d);\n", offset, any ? "any" : ((struct tl_tree_type *)arg->type)->type->print_id, safe_field_name (arg->id), num);      
       } else {
         printf ("%sfree_ds_type_%s (D->f%d, field%d);\n", offset, any ? "any" : ((struct tl_tree_type *)arg->type)->type->print_id, num - 1, num);      
       }
@@ -922,15 +955,15 @@ int gen_field_free_ds (struct arg *arg, int *vars, int num, int empty) {
       printf ("%s{\n", offset);
       printf ("%s  int i = 0;\n", offset);
       printf ("%s  while (i < multiplicity%d) {\n", offset, num);
-      if (arg->id && strlen (arg->id)) {
-        printf ("%s    free_ds_type_%s (D->%s[i ++], field%d);\n", offset, "any", arg->id, num);
+      if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id))) {
+        printf ("%s    free_ds_type_%s (D->%s[i ++], field%d);\n", offset, "any", safe_field_name (arg->id), num);
       } else {
         printf ("%s    free_ds_type_%s (D->f%d[i ++], field%d);\n", offset, "any", num - 1, num);
       }
       printf ("%s  }\n", offset);
       printf ("%s}\n", offset);
-      if (arg->id && strlen (arg->id)) {
-        printf ("%stfree (D->%s, sizeof (void *) * multiplicity%d);\n", offset, arg->id, num);
+      if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id))) {
+        printf ("%stfree (D->%s, sizeof (void *) * multiplicity%d);\n", offset, safe_field_name (arg->id), num);
       } else {
         printf ("%stfree (D->f%d, sizeof (void *) * multiplicity%d);\n", offset, num - 1, num);
       }
@@ -959,12 +992,12 @@ int gen_field_store_ds (struct arg *arg, int *vars, int num, int empty) {
       assert (0);
     } else {
       assert (t == NAME_VAR_NUM);
-      if (arg->id && strlen (arg->id)) {
+      if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id))) {
         if (vars[arg->var_num] == 0) {
-          printf ("%sstruct paramed_type *var%d = INT2PTR (*D->%s);\n", offset, arg->var_num, arg->id);
+          printf ("%sstruct paramed_type *var%d = INT2PTR (*D->%s);\n", offset, arg->var_num, safe_field_name (arg->id));
           vars[arg->var_num] = 2;
         } else if (vars[arg->var_num] == 2) {
-          printf ("%sassert (vars%d == INT2PTR (*D->%s));\n", offset, arg->var_num, arg->id);
+          printf ("%sassert (vars%d == INT2PTR (*D->%s));\n", offset, arg->var_num, safe_field_name (arg->id));
         }
         printf ("%sout_int (PTR2INT (var%d));\n", offset, arg->var_num);
       } else {
@@ -989,8 +1022,8 @@ int gen_field_store_ds (struct arg *arg, int *vars, int num, int empty) {
       printf (";\n");
       int any = (t == NODE_TYPE_VAR_TYPE);
       int vec = ((struct tl_tree_type *)arg->type)->type->name == NAME_VECTOR;
-      if (arg->id && strlen (arg->id)) {
-        printf ("%sstore_ds_type_%s%s (%sD->%s, field%d);\n", offset, bare ? "bare_" : "", any ? "any" : ((struct tl_tree_type *)arg->type)->type->print_id, vec ? "(void *)" : "", arg->id, num);      
+      if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id))) {
+        printf ("%sstore_ds_type_%s%s (%sD->%s, field%d);\n", offset, bare ? "bare_" : "", any ? "any" : ((struct tl_tree_type *)arg->type)->type->print_id, vec ? "(void *)" : "", safe_field_name (arg->id), num);      
       } else {
         printf ("%sstore_ds_type_%s%s (%sD->f%d, field%d);\n", offset, bare ? "bare_" : "", any ? "any" : ((struct tl_tree_type *)arg->type)->type->print_id, vec ? "(void *)" : "", num - 1, num);      
       }
@@ -1005,8 +1038,8 @@ int gen_field_store_ds (struct arg *arg, int *vars, int num, int empty) {
       printf ("%s{\n", offset);
       printf ("%s  int i = 0;\n", offset);
       printf ("%s  while (i < multiplicity%d) {\n", offset, num);
-      if (arg->id && strlen (arg->id)) {
-        printf ("%s    store_ds_type_%s (D->%s[i ++], field%d);\n", offset, "any", arg->id, num);
+      if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id))) {
+        printf ("%s    store_ds_type_%s (D->%s[i ++], field%d);\n", offset, "any", safe_field_name (arg->id), num);
       } else {
         printf ("%s    store_ds_type_%s (D->f%d[i ++], field%d);\n", offset, "any", num - 1, num);
       }
@@ -1032,8 +1065,8 @@ int gen_field_print_ds (struct arg *arg, int *vars, int num, int empty) {
   if (!empty) {
     printf("%sif (multiline_output >= 2) { print_offset (); }\n", offset);
   }
-  if (arg->id && strlen (arg->id) && !empty) {
-    printf ("%sif (!disable_field_names) { eprintf (\" %s :\"); }\n", offset, arg->id);
+  if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id)) && !empty) {
+    printf ("%sif (!disable_field_names) { eprintf (\" %s :\"); }\n", offset, safe_field_name (arg->id));
   }
   if (arg->var_num >= 0) {
     assert (TL_TREE_METHODS (arg->type)->type (arg->type) == NODE_TYPE_TYPE);
@@ -1042,12 +1075,12 @@ int gen_field_print_ds (struct arg *arg, int *vars, int num, int empty) {
       fprintf (stderr, "Not supported yet\n");
       assert (0);
     } else {
-      if (arg->id && strlen (arg->id)) {
+      if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id))) {
         if (vars[arg->var_num] == 0) {
-          printf ("%sstruct paramed_type *var%d = INT2PTR (*DS->%s);\n", offset, arg->var_num, arg->id);
+          printf ("%sstruct paramed_type *var%d = INT2PTR (*DS->%s);\n", offset, arg->var_num, safe_field_name (arg->id));
           vars[arg->var_num] = 2;
         } else if (vars[arg->var_num] == 2) {
-          printf ("%sassert (vars%d == INT2PTR (*DS->%s));\n", offset, arg->var_num, arg->id);
+          printf ("%sassert (vars%d == INT2PTR (*DS->%s));\n", offset, arg->var_num, safe_field_name (arg->id));
         }
       } else {
         if (vars[arg->var_num] == 0) {
@@ -1071,8 +1104,8 @@ int gen_field_print_ds (struct arg *arg, int *vars, int num, int empty) {
       }
       int any = (t == NODE_TYPE_VAR_TYPE);
       int vec = ((struct tl_tree_type *)arg->type)->type->name == NAME_VECTOR;
-      if (arg->id && strlen (arg->id)) {
-        printf ("%sprint_ds_type_%s%s (%sDS->%s, field%d);\n", offset, bare ? "bare_" : "", any ? "any" : ((struct tl_tree_type *)arg->type)->type->print_id, vec ? "(void *)" : "", arg->id, num);      
+      if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id))) {
+        printf ("%sprint_ds_type_%s%s (%sDS->%s, field%d);\n", offset, bare ? "bare_" : "", any ? "any" : ((struct tl_tree_type *)arg->type)->type->print_id, vec ? "(void *)" : "", safe_field_name (arg->id), num);      
       } else {
         printf ("%sprint_ds_type_%s%s (%sDS->f%d, field%d);\n", offset, bare ? "bare_" : "", any ? "any" : ((struct tl_tree_type *)arg->type)->type->print_id, vec ? "(void *)" : "", num - 1, num);      
       }
@@ -1091,8 +1124,8 @@ int gen_field_print_ds (struct arg *arg, int *vars, int num, int empty) {
       printf ("%s  int i = 0;\n", offset);
       printf ("%s  while (i < multiplicity%d) {\n", offset, num);
       printf ("%s    if (multiline_output >= 1) { print_offset (); }\n", offset);
-      if (arg->id && strlen (arg->id)) {
-        printf ("%s    print_ds_type_%s (DS->%s[i ++], field%d);\n", offset, "any", arg->id, num);
+      if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id))) {
+        printf ("%s    print_ds_type_%s (DS->%s[i ++], field%d);\n", offset, "any", safe_field_name (arg->id), num);
       } else {
         printf ("%s    print_ds_type_%s (DS->f%d[i ++], field%d);\n", offset, "any", num - 1, num);
       }
@@ -1122,13 +1155,13 @@ int gen_field_autocomplete_excl (struct arg *arg, int *vars, int num, int from_f
   }
   char *fail = from_func ? "0" : "-1";
   char *expect = from_func ? "expect_token_ptr_autocomplete" : "expect_token_autocomplete";
-  if (arg->id && strlen (arg->id) > 0) {
-    printf ("%sif (cur_token_len == -3 && cur_token_real_len <= %d && !cur_token_quoted && !memcmp (cur_token, \"%s\", cur_token_real_len)) {\n", offset, (int)(strlen (arg->id)), arg->id);
-    printf ("%s  set_autocomplete_string (\"%s\");\n", offset, arg->id);
+  if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id)) > 0) {
+    printf ("%sif (cur_token_len == -3 && cur_token_real_len <= %d && !cur_token_quoted && !memcmp (cur_token, \"%s\", cur_token_real_len)) {\n", offset, (int)(strlen (safe_field_name (arg->id))), safe_field_name (arg->id));
+    printf ("%s  set_autocomplete_string (\"%s\");\n", offset, safe_field_name (arg->id));
     printf ("%s  return %s;\n", offset, fail);
     printf ("%s}\n", offset);
 
-    printf ("%sif (cur_token_len >= 0 && cur_token_len == %d && !memcmp (cur_token, \"%s\", cur_token_len)) {\n", offset, (int)(strlen (arg->id)), arg->id);
+    printf ("%sif (cur_token_len >= 0 && cur_token_len == %d && !memcmp (cur_token, \"%s\", cur_token_len)) {\n", offset, (int)(strlen (safe_field_name (arg->id))), safe_field_name (arg->id));
     printf ("%s  local_next_token ();\n", offset);
     printf ("%s  %s (\":\", 1);\n", offset, expect);
     printf ("%s}\n", offset);
@@ -1156,8 +1189,8 @@ int gen_field_store_excl (struct arg *arg, int *vars, int num, int from_func) {
     offset = "    ";
   }
   char *expect = from_func ? "expect_token_ptr" : "expect_token";
-  if (arg->id && strlen (arg->id) > 0) {
-    printf ("%sif (cur_token_len >= 0 && cur_token_len == %d && !cur_token_quoted && !memcmp (cur_token, \"%s\", cur_token_len)) {\n", offset, (int)(strlen (arg->id)), arg->id);
+  if (safe_field_name (arg->id) && strlen (safe_field_name (arg->id)) > 0) {
+    printf ("%sif (cur_token_len >= 0 && cur_token_len == %d && !cur_token_quoted && !memcmp (cur_token, \"%s\", cur_token_len)) {\n", offset, (int)(strlen (safe_field_name (arg->id))), safe_field_name (arg->id));
     printf ("%s  local_next_token ();\n", offset);
     printf ("%s  %s (\":\", 1);\n", offset, expect);
     printf ("%s}\n", offset);
@@ -1201,7 +1234,7 @@ void gen_constructor_skip (struct tl_combinator *c) {
     printf ("  return 0;\n");
     printf ("}\n");
     return;
-  } else if (c->name == NAME_STRING) {
+  } else if (c->name == NAME_STRING || c->name == NAME_BYTES) {
     printf ("  int l = prefetch_strlen ();\n");
     printf ("  if (l < 0) { return -1;}\n");
     printf ("  fetch_str (l);\n");
@@ -1250,7 +1283,7 @@ void gen_constructor_fetch (struct tl_combinator *c) {
     printf ("  return 0;\n");
     printf ("}\n");
     return;
-  } else if (c->name == NAME_STRING) {
+  } else if (c->name == NAME_STRING || c->name == NAME_BYTES) {
     printf ("  static char buf[1 << 22];\n");
     printf ("  int l = prefetch_strlen ();\n");
     printf ("  if (l < 0 || (l >= (1 << 22) - 2)) { return -1; }\n");
@@ -1319,7 +1352,7 @@ void gen_constructor_store (struct tl_combinator *c) {
     printf ("  }\n");
     printf ("}\n");
     return;
-  } else if (c->name == NAME_STRING) {
+  } else if (c->name == NAME_STRING || c->name == NAME_BYTES) {
     printf ("  if (cur_token_len >= 0) {\n");
     printf ("    out_cstring (cur_token, cur_token_len);\n");
     printf ("    local_next_token ();\n");
@@ -1384,7 +1417,7 @@ void gen_constructor_autocomplete (struct tl_combinator *c) {
     printf ("  }\n");
     printf ("}\n");
     return;
-  } else if (c->name == NAME_STRING) {
+  } else if (c->name == NAME_STRING || c->name == NAME_BYTES) {
     printf ("  if (cur_token_len >= 0) {\n");
     printf ("    local_next_token ();\n");
     printf ("    return 0;\n");
@@ -2554,14 +2587,14 @@ void gen_types_header (void) {
       int k;
       for (k = 0; k < c->args_num; k++) {
         if ((c->args[k]->flags & FLAG_OPT_VAR)) { continue; }
-        if (c->args[k]->id && strlen (c->args[k]->id) && j > 0) {
+        if (safe_field_name (c->args[k]->id) && strlen (safe_field_name (c->args[k]->id)) && j > 0) {
           int l;
           int ok = 1;
           for (l = 0; l < j && ok; l++) {
             int m;
             struct tl_combinator *d = tps[i]->constructors[l];
             for (m = 0; m < d->args_num && ok; m++) {
-              if (d->args[m]->id && !strcmp (d->args[m]->id, c->args[k]->id)) {
+              if (d->args[m]->id && !strcmp (safe_field_name (d->args[m]->id), safe_field_name (c->args[k]->id))) {
                 ok = 0;
               }
             }
@@ -2577,7 +2610,7 @@ void gen_types_header (void) {
           
           printf ("f%d;\n", k);
         } else {
-          printf ("%s;\n", c->args[k]->id);
+          printf ("%s;\n", safe_field_name (c->args[k]->id));
         }
       }
     }

@@ -2444,7 +2444,8 @@ int tl_parse_builtin_combinator_decl (struct tree *T, int fun) {
   if ((!mystrcmp2 (T->c[0]->text, T->c[0]->len, "int") && !mystrcmp2 (T->c[1]->text, T->c[1]->len, "Int")) ||
       (!mystrcmp2 (T->c[0]->text, T->c[0]->len, "long") && !mystrcmp2 (T->c[1]->text, T->c[1]->len, "Long")) ||
       (!mystrcmp2 (T->c[0]->text, T->c[0]->len, "double") && !mystrcmp2 (T->c[1]->text, T->c[1]->len, "Double")) ||
-      (!mystrcmp2 (T->c[0]->text, T->c[0]->len, "string") && !mystrcmp2 (T->c[1]->text, T->c[1]->len, "String"))) {
+          (!mystrcmp2 (T->c[0]->text, T->c[0]->len, "string") && !mystrcmp2 (T->c[1]->text, T->c[1]->len, "String")) ||
+          (!mystrcmp2 (T->c[0]->text, T->c[0]->len, "bytes") && !mystrcmp2 (T->c[1]->text, T->c[1]->len, "Bytes"))) {
     struct tl_type *t = tl_add_type (T->c[1]->text, T->c[1]->len, 0, 0);
     if (!t) {
       return 0;
@@ -2950,7 +2951,7 @@ void write_type (struct tl_type *t) {
 }
 
 int is_builtin_type (const char *id) {
-  return !strcmp (id, "int") || !strcmp (id, "long") || !strcmp (id, "double") || !strcmp (id, "string");
+  return !strcmp (id, "int") || !strcmp (id, "long") || !strcmp (id, "double") || !strcmp (id, "string") || !strcmp (id, "bytes");
 }
 
 void write_combinator (struct tl_constructor *c) {
