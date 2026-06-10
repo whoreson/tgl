@@ -84,7 +84,7 @@ int tgl_check_qts_diff (struct tgl_state *TLS, int qts, int qts_count) {
 
 int tgl_check_channel_pts_diff (struct tgl_state *TLS, tgl_peer_t *_E, int pts, int pts_count) {
   struct tgl_channel *E = &_E->channel;
-  vlogprintf (E_DEBUG - 1, "channel %d: pts = %d, pts_count = %d, current_pts = %d\n", tgl_get_peer_id (E->id), pts, pts_count, E->pts);
+  vlogprintf (E_DEBUG - 1, "channel %lld: pts = %d, pts_count = %d, current_pts = %d\n", tgl_get_peer_id (E->id), pts, pts_count, E->pts);
   if (!E->pts) {
     return 1;
   }

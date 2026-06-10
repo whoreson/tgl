@@ -1642,7 +1642,7 @@ void tglp_insert_channel (struct tgl_state *TLS, tgl_peer_t *P) {
   TLS->Peers[TLS->peer_num ++] = P;
 }
 
-void tgl_insert_empty_user (struct tgl_state *TLS, int uid) {
+void tgl_insert_empty_user (struct tgl_state *TLS, long long uid) {
   tgl_peer_id_t id = TGL_MK_USER (uid);
   if (tgl_peer_get (TLS, id)) { return; }
   tgl_peer_t *P = talloc0 (sizeof (*P));
@@ -1650,7 +1650,7 @@ void tgl_insert_empty_user (struct tgl_state *TLS, int uid) {
   tglp_insert_user (TLS, P);
 }
 
-void tgl_insert_empty_chat (struct tgl_state *TLS, int cid) {
+void tgl_insert_empty_chat (struct tgl_state *TLS, long long cid) {
   tgl_peer_id_t id = TGL_MK_CHAT (cid);
   if (tgl_peer_get (TLS, id)) { return; }
   tgl_peer_t *P = talloc0 (sizeof (*P));

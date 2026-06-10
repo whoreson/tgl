@@ -557,7 +557,7 @@ void bl_do_encr_chat_exchange (struct tgl_state *TLS, tgl_peer_id_t id, long lon
 }
 /* }}} */
 
-void bl_do_user (struct tgl_state *TLS, int id, long long *access_hash, const char *first_name, int first_name_len, const char *last_name, int last_name_len, const char *phone, int phone_len, const char *username, int username_len, struct tl_ds_photo *photo, struct tl_ds_user_profile_photo *profile_photo, int *last_read_in, int *last_read_out, struct tl_ds_bot_info *bot_info, int flags) /* {{{ */ {
+void bl_do_user (struct tgl_state *TLS, long long id, long long *access_hash, const char *first_name, int first_name_len, const char *last_name, int last_name_len, const char *phone, int phone_len, const char *username, int username_len, struct tl_ds_photo *photo, struct tl_ds_user_profile_photo *profile_photo, int *last_read_in, int *last_read_out, struct tl_ds_bot_info *bot_info, int flags) /* {{{ */ {
   tgl_peer_t *_U = tgl_peer_get (TLS, TGL_MK_USER (id));
 
   unsigned updates = 0;
@@ -568,11 +568,15 @@ void bl_do_user (struct tgl_state *TLS, int id, long long *access_hash, const ch
       _U->id = TGL_MK_USER (id);
       tglp_insert_user (TLS, _U);
     } else {
-      assert (!(_U->flags & TGLPF_CREATED));
+      /* peer already created - skip */
     }
     updates |= TGL_UPDATE_CREATED;
   } else {
-    assert (_U->flags & TGLPF_CREATED);
+    if (!(_U->flags & TGLPF_CREATED)) {
+      _U = talloc0 (sizeof (*_U));
+      _U->id = TGL_MK_USER (id);
+      tglp_insert_user (TLS, _U);
+    }
   }
 
   struct tgl_user *U = (void *)_U;
@@ -671,7 +675,7 @@ void bl_do_user (struct tgl_state *TLS, int id, long long *access_hash, const ch
 }
 /* }}} */
 
-void bl_do_chat (struct tgl_state *TLS, int id, const char *title, int title_len, int *user_num, int *date, int *version, struct tl_ds_vector *participants, struct tl_ds_chat_photo *chat_photo, struct tl_ds_photo *photo, int *admin, int *last_read_in, int *last_read_out, int flags) /* {{{ */ {
+void bl_do_chat (struct tgl_state *TLS, long long id, const char *title, int title_len, int *user_num, int *date, int *version, struct tl_ds_vector *participants, struct tl_ds_chat_photo *chat_photo, struct tl_ds_photo *photo, int *admin, int *last_read_in, int *last_read_out, int flags) /* {{{ */ {
   tgl_peer_t *_U = tgl_peer_get (TLS, TGL_MK_CHAT (id));
 
   unsigned updates = 0;
@@ -682,11 +686,15 @@ void bl_do_chat (struct tgl_state *TLS, int id, const char *title, int title_len
       _U->id = TGL_MK_CHAT (id);
       tglp_insert_chat (TLS, _U);
     } else {
-      assert (!(_U->flags & TGLPF_CREATED));
+      /* peer already created - skip */
     }
     updates |= TGL_UPDATE_CREATED;
   } else {
-    assert (_U->flags & TGLPF_CREATED);
+    if (!(_U->flags & TGLPF_CREATED)) {
+      _U = talloc0 (sizeof (*_U));
+      _U->id = TGL_MK_CHAT (id);
+      tglp_insert_chat (TLS, _U);
+    }
   }
 
   struct tgl_chat *C = &_U->chat;
@@ -796,11 +804,15 @@ void bl_do_encr_chat (struct tgl_state *TLS, int id, long long *access_hash, int
       _U->id = TGL_MK_ENCR_CHAT (id);
       tglp_insert_encrypted_chat (TLS, _U);
     } else {
-      assert (!(_U->flags & TGLPF_CREATED));
+      /* peer already created - skip */
     }
     updates |= TGL_UPDATE_CREATED;
   } else {
-    assert (_U->flags & TGLPF_CREATED);
+    if (!(_U->flags & TGLPF_CREATED)) {
+      _U = talloc0 (sizeof (*_U));
+      _U->id = TGL_MK_ENCR_CHAT (id);
+      tglp_insert_encrypted_chat (TLS, _U);
+    }
   }
 
   struct tgl_secret_chat *U = (void *)_U;
@@ -902,7 +914,7 @@ void bl_do_encr_chat (struct tgl_state *TLS, int id, long long *access_hash, int
 }
 /* }}} */
 
-void bl_do_channel (struct tgl_state *TLS, int id, long long *access_hash, int *date, const char *title, int title_len, const char *username, int username_len, struct tl_ds_chat_photo *chat_photo, struct tl_ds_photo *photo, int *version, char *about, int about_len, int *participants_count, int *admins_count, int *kicked_count, int *last_read_in, int flags) /* {{{ */ {
+void bl_do_channel (struct tgl_state *TLS, long long id, long long *access_hash, int *date, const char *title, int title_len, const char *username, int username_len, struct tl_ds_chat_photo *chat_photo, struct tl_ds_photo *photo, int *version, char *about, int about_len, int *participants_count, int *admins_count, int *kicked_count, int *last_read_in, int flags) /* {{{ */ {
   tgl_peer_t *_U = tgl_peer_get (TLS, TGL_MK_CHANNEL (id));
 
   unsigned updates = 0;
@@ -913,11 +925,15 @@ void bl_do_channel (struct tgl_state *TLS, int id, long long *access_hash, int *
       _U->id = TGL_MK_CHANNEL (id);
       tglp_insert_channel (TLS, _U);
     } else {
-      assert (!(_U->flags & TGLPF_CREATED));
+      /* peer already created - skip */
     }
     updates |= TGL_UPDATE_CREATED;
   } else {
-    assert (_U->flags & TGLPF_CREATED);
+    if (!(_U->flags & TGLPF_CREATED)) {
+      _U = talloc0 (sizeof (*_U));
+      _U->id = TGL_MK_CHANNEL (id);
+      tglp_insert_channel (TLS, _U);
+    }
   }
   
   struct tgl_channel *C = &_U->channel;

@@ -319,11 +319,11 @@ static inline int tgl_get_peer_type (tgl_peer_id_t id) {
   return id.peer_type;
 }
 
-static inline int tgl_get_peer_id (tgl_peer_id_t id) {
+static inline long long tgl_get_peer_id (tgl_peer_id_t id) {
   return id.peer_id;
 }
 
-static inline tgl_peer_id_t tgl_set_peer_id (int type, int id) {
+static inline tgl_peer_id_t tgl_set_peer_id (int type, long long id) {
   tgl_peer_id_t ID;
   ID.peer_id = id;
   ID.peer_type = type;
@@ -332,7 +332,10 @@ static inline tgl_peer_id_t tgl_set_peer_id (int type, int id) {
 }
 
 static inline int tgl_cmp_peer_id (tgl_peer_id_t a, tgl_peer_id_t b) {
-  return memcmp (&a, &b, 8);
+  if (a.peer_type != b.peer_type) { return a.peer_type - b.peer_type; }
+  if (a.peer_id < b.peer_id) { return -1; }
+  if (a.peer_id > b.peer_id) { return 1; }
+  return 0;
 }
 
 void tgl_incr_verbosity (struct tgl_state *TLS);
@@ -370,8 +373,8 @@ typedef tgl_peer_id_t tgl_chat_id_t;
 typedef tgl_peer_id_t tgl_secret_chat_id_t;
 typedef tgl_peer_id_t tgl_user_or_chat_id_t;
 
-void tgl_insert_empty_user (struct tgl_state *TLS, int id);
-void tgl_insert_empty_chat (struct tgl_state *TLS, int id);
+void tgl_insert_empty_user (struct tgl_state *TLS, long long id);
+void tgl_insert_empty_chat (struct tgl_state *TLS, long long id);
 
 
 void tgl_free_all (struct tgl_state *TLS);
