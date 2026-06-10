@@ -281,6 +281,12 @@ struct tgl_photo_size {
   int h;
   int size;
   char *data;
+  /* layer 224+: for inputPhotoFileLocation */
+  long long photo_id;        /* parent photo id */
+  long long photo_access_hash; /* parent photo access_hash */
+  int photo_dc_id;           /* parent photo dc_id */
+  int file_reference_len;    /* file reference length */
+  char *file_reference;      /* file reference bytes */
 };
 
 struct tgl_geo {
@@ -298,6 +304,9 @@ struct tgl_photo {
   //struct tgl_geo geo;
   int sizes_num;
   struct tgl_photo_size *sizes;
+  int dc_id;                    /* layer 224+: DC where photo is stored */
+  int file_reference_len;       /* layer 224+: file reference length */
+  char *file_reference;         /* layer 224+: file reference bytes */
 };
 
 struct tgl_encr_document {

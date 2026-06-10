@@ -787,6 +787,8 @@ struct tgl_channel *tglf_fetch_alloc_channel_full (struct tgl_state *TLS, struct
 void tglf_fetch_photo_size (struct tgl_state *TLS, struct tgl_photo_size *S, struct tl_ds_photo_size *DS_PS) {
   memset (S, 0, sizeof (*S));
 
+  if (!DS_PS) { return; }
+
   S->type = DS_STR_DUP (DS_PS->type);
   S->w = DS_LVAL (DS_PS->w);
   S->h = DS_LVAL (DS_PS->h);
@@ -828,11 +830,44 @@ struct tgl_photo *tglf_fetch_alloc_photo (struct tgl_state *TLS, struct tl_ds_ph
     tglf_fetch_geo (TLS, &P->geo, DS_P->geo);
   }*/
 
-  P->sizes_num = DS_LVAL (DS_P->sizes->cnt);
-  P->sizes = talloc (sizeof (struct tgl_photo_size) * P->sizes_num);
-  int i;
-  for (i = 0; i < P->sizes_num; i++) {
-    tglf_fetch_photo_size (TLS, &P->sizes[i], DS_P->sizes->data[i]);
+  if (DS_P->sizes && DS_P->sizes->cnt) {
+    P->sizes_num = DS_LVAL (DS_P->sizes->cnt);
+    if (P->sizes_num > 0) {
+      P->sizes = talloc (sizeof (struct tgl_photo_size) * P->sizes_num);
+      int i;
+      for (i = 0; i < P->sizes_num; i++) {
+        if (DS_P->sizes->data && DS_P->sizes->data[i]) {
+          tglf_fetch_photo_size (TLS, &P->sizes[i], DS_P->sizes->data[i]);
+        }
+      }
+    }
+  }
+
+  /* layer 224+: store dc_id and file_reference from the photo object */
+  P->dc_id = DS_P->dc_id ? DS_LVAL (DS_P->dc_id) : 0;
+  P->file_reference_len = 0;
+  P->file_reference = NULL;
+  if (DS_P->file_reference && DS_P->file_reference->len > 0) {
+    P->file_reference_len = DS_P->file_reference->len;
+    P->file_reference = talloc (P->file_reference_len);
+    memcpy (P->file_reference, DS_P->file_reference->data, P->file_reference_len);
+  }
+
+  /* Propagate photo-level info into each size for download access */
+  if (P->sizes && P->sizes_num > 0) {
+    int i;
+    for (i = 0; i < P->sizes_num; i++) {
+      P->sizes[i].photo_id = P->id;
+      P->sizes[i].photo_access_hash = P->access_hash;
+      P->sizes[i].photo_dc_id = P->dc_id;
+      P->sizes[i].file_reference_len = P->file_reference_len;
+      if (P->file_reference_len > 0 && P->file_reference) {
+        P->sizes[i].file_reference = talloc (P->file_reference_len);
+        memcpy (P->sizes[i].file_reference, P->file_reference, P->file_reference_len);
+      }
+      /* Also set loc.dc for legacy compatibility */
+      P->sizes[i].loc.dc = P->dc_id;
+    }
   }
 
   return P;
@@ -877,7 +912,8 @@ void tglf_fetch_document_attribute (struct tgl_state *TLS, struct tgl_document *
     D->caption = DS_STR_DUP (DS_DA->file_name);
     return;
   default:
-    assert (0);
+    /* Unknown document attribute, skip */
+    break;
   }
 }
 
@@ -909,10 +945,12 @@ struct tgl_document *tglf_fetch_alloc_document (struct tgl_state *TLS, struct tl
 
   tglf_fetch_photo_size (TLS, &D->thumb, NULL);
 
-  if (DS_D->attributes) {
+  if (DS_D->attributes && DS_D->attributes->cnt) {
     int i;
     for (i = 0; i < DS_LVAL (DS_D->attributes->cnt); i++) {
-      tglf_fetch_document_attribute (TLS, D, DS_D->attributes->data[i]);
+      if (DS_D->attributes->data && DS_D->attributes->data[i]) {
+        tglf_fetch_document_attribute (TLS, D, DS_D->attributes->data[i]);
+      }
     }
   }
   return D;
@@ -1108,9 +1146,64 @@ struct tgl_message *tglf_fetch_alloc_message_short_chat (struct tgl_state *TLS, 
 }
 
 void tglf_fetch_message_media (struct tgl_state *TLS, struct tgl_message_media *M, struct tl_ds_message_media *DS_MM){
-  (void)TLS;
-  (void)M;
-  (void)DS_MM;
+  if (!DS_MM || !M) { return; }
+  memset (M, 0, sizeof (*M));
+
+  switch (DS_MM->magic) {
+  case CODE_message_media_empty:
+    M->type = tgl_message_media_none;
+    break;
+  case CODE_message_media_photo:
+    M->type = tgl_message_media_photo;
+    if (DS_MM->photo) {
+      M->photo = tglf_fetch_alloc_photo (TLS, DS_MM->photo);
+    }
+    break;
+  case CODE_message_media_geo:
+  case CODE_message_media_geo_live:
+    M->type = tgl_message_media_geo;
+    if (DS_MM->geo) {
+      M->geo.longitude = DS_LVAL (DS_MM->geo->long_f);
+      M->geo.latitude = DS_LVAL (DS_MM->geo->lat);
+    }
+    break;
+  case CODE_message_media_contact:
+    M->type = tgl_message_media_contact;
+    if (DS_MM->phone_number) { M->phone = DS_STR_DUP (DS_MM->phone_number); }
+    if (DS_MM->first_name) { M->first_name = DS_STR_DUP (DS_MM->first_name); }
+    if (DS_MM->last_name) { M->last_name = DS_STR_DUP (DS_MM->last_name); }
+    if (DS_MM->user_id) { M->user_id = DS_LVAL (DS_MM->user_id); }
+    break;
+  case CODE_message_media_document:
+    M->type = tgl_message_media_document;
+    if (DS_MM->document) {
+      M->document = tglf_fetch_alloc_document (TLS, DS_MM->document);
+    }
+    break;
+  case CODE_message_media_video_stream:
+    M->type = tgl_message_media_video;
+    if (DS_MM->video) {
+      M->document = tglf_fetch_alloc_document (TLS, DS_MM->video);
+    }
+    break;
+  case CODE_message_media_web_page:
+    M->type = tgl_message_media_webpage;
+    break;
+  case CODE_message_media_venue:
+    M->type = tgl_message_media_venue;
+    if (DS_MM->geo) {
+      M->venue.geo.longitude = DS_LVAL (DS_MM->geo->long_f);
+      M->venue.geo.latitude = DS_LVAL (DS_MM->geo->lat);
+    }
+    if (DS_MM->title) { M->venue.title = DS_STR_DUP (DS_MM->title); }
+    if (DS_MM->address) { M->venue.address = DS_STR_DUP (DS_MM->address); }
+    if (DS_MM->provider) { M->venue.provider = DS_STR_DUP (DS_MM->provider); }
+    if (DS_MM->venue_id) { M->venue.venue_id = DS_STR_DUP (DS_MM->venue_id); }
+    break;
+  default:
+    M->type = tgl_message_media_unsupported;
+    break;
+  }
 }
 
 void tglf_fetch_message_media_encrypted (struct tgl_state *TLS, struct tgl_message_media *M, struct tl_ds_decrypted_message_media *DS_DMM){

@@ -3144,6 +3144,10 @@ struct download {
   unsigned char *key;
   int type;
   int refcnt;
+  /* layer 224+: file reference for inputPhotoFileLocation */
+  int file_reference_len;
+  char *file_reference;
+  char *thumb_size;  /* photo size type string (e.g. "x") */
 };
 
 
@@ -3225,6 +3229,8 @@ static int download_on_answer (struct tgl_state *TLS, struct query *q, void *DD)
 }
 
 static int download_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, const char *error) {
+  fprintf(stderr, "[TGL] download_on_error: code=%d error=%.*s\n", error_code, error_len, error);
+  fflush(stderr);
   tgl_set_query_error (TLS, EPROTO, "RPC_CALL_FAIL %d: %.*s", error_code, error_len, error);
 
   struct download *D = q->extra;
@@ -3291,11 +3297,24 @@ static void load_next_part (struct tgl_state *TLS, struct download *D, void *cal
   D->refcnt ++;
   clear_packet ();
   out_int (CODE_upload_get_file);
+  /* Layer 224+: upload.getFile flags:# precise:flags.0?true location:InputFileLocation offset:long limit:int */
+  out_int (0); /* flags = 0 (no precise) */
   if (!D->id) {
+    /* Legacy: inputFileLocation */
     out_int (CODE_input_file_location);
     out_long (D->volume);
     out_int (D->local_id);
     out_long (D->secret);
+  } else if (D->type == CODE_input_photo_file_location) {
+    /* Layer 224+: inputPhotoFileLocation */
+    out_int (CODE_input_photo_file_location);
+    out_long (D->id);
+    out_long (D->access_hash);
+    /* file_reference: bytes */
+    out_cstring (D->file_reference && D->file_reference_len > 0 ? D->file_reference : "",
+                 D->file_reference && D->file_reference_len > 0 ? D->file_reference_len : 0);
+    /* thumb_size: string */
+    out_string (D->thumb_size ? D->thumb_size : "x");
   } else {
     if (D->iv) {
       out_int (CODE_input_encrypted_file_location);
@@ -3305,22 +3324,43 @@ static void load_next_part (struct tgl_state *TLS, struct download *D, void *cal
     out_long (D->id);
     out_long (D->access_hash);
   }
-  out_int (D->offset);
+  out_long ((long long)D->offset);
   out_int (D->size ? (1 << 14) : (1 << 19));
   tglq_send_query (TLS, TLS->DC_list[D->dc], packet_ptr - packet_buffer, packet_buffer, &download_methods, D, callback, callback_extra);
   //tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &download_methods, D);
 }
 
 void tgl_do_load_photo_size (struct tgl_state *TLS, struct tgl_photo_size *P, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *filename), void *callback_extra) {
+  assert (P);
+
+  /* Check if we have layer 224+ photo data (photo_id != 0) */
+  if (P->photo_id && P->photo_dc_id) {
+    /* Layer 224+: use inputPhotoFileLocation */
+    struct download *D = talloc0 (sizeof (*D));
+    D->id = P->photo_id;
+    D->access_hash = P->photo_access_hash;
+    D->dc = P->photo_dc_id;
+    D->offset = 0;
+    D->size = P->size;
+    D->type = CODE_input_photo_file_location;
+    D->file_reference_len = P->file_reference_len;
+    D->file_reference = P->file_reference;  /* borrowed pointer, valid while photo is alive */
+    D->thumb_size = P->type;  /* borrowed pointer to type string (e.g. "x") */
+    D->name = 0;
+    D->fd = -1;
+    load_next_part (TLS, D, callback, callback_extra);
+    return;
+  }
+
+  /* Legacy: use inputFileLocation with volume/local_id/secret */
   if (!P->loc.dc) {
-    vlogprintf (E_WARNING, "Bad video thumb\n");
+    vlogprintf (E_WARNING, "Bad photo size (no dc)\n");
     if (callback) {
       callback (TLS, callback_extra, 0, 0);
     }
     return;
   }
 
-  assert (P);
   struct download *D = talloc0 (sizeof (*D));
   D->id = 0;
   D->offset = 0;
